@@ -1,13 +1,12 @@
 //-----------------------------
 // Title: First Assembly Programming
 //-----------------------------
-// Purpose: what does this program do? 
-// Dependencies: Are you using any header files - if no say NONE
-// Compiler: Which IDE Simulator Version ???
-// Author: Your name 
-// OUTPUTS: outputs of this program? What are they connected to? 
-// INPUTS: inputs of this program? What are they connected to? 
+// Purpose: This program compares an input temperature to a measured temperature and either turns on a cooling fan or heater to regulate temperature. 
+// Dependencies: Not sure yet
+// Compiler: MPLAB X IDE v6.30
+// Author: Tyler Klahr
+// OUTPUTS: PORTD1 and PORTD2 are connected to the cooling fan and heater.
+// INPUTS: The two inputs are the refference temperature and the measured temperature from the sensor. Connected to a decimal to hex converter.
 // Versions:
-//  	V1.0: today’s date - First version 
-//  	V1.2: date - Changes something….
-//-----------------------------
+//  	V1.0: 3/9/26 - First version 
+
