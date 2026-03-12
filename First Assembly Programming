@@ -9,4 +9,51 @@
 // INPUTS: The two inputs are the refference temperature and the measured temperature from the sensor. Connected to a decimal to hex converter.
 // Versions:
 //  	V1.0: 3/9/26 - First version 
+ 
+#include <xc.inc>
 
+;-------------------------
+; Reset Vector
+;-------------------------
+PSECT resetVec,class=CODE,reloc=2
+resetVec:
+    GOTO    start
+
+;-------------------------
+; Program Code
+;-------------------------
+PSECT code
+ORG     0x20
+
+start:
+
+;----------------
+; Program Inputs
+;----------------
+#define measuredTempInput  -5
+#define refTempInput       15
+
+;-------------
+; Definitions
+;-------------
+refTemp         EQU     0x20
+measuredTemp    EQU     0x21
+contReg         EQU     0x22
+
+REG10           EQU     0x10
+REG11           EQU     0x11
+REG01           EQU     0x01
+
+refOnes         EQU     0x60
+refTens         EQU     0x61
+refHundreds     EQU     0x62
+
+measOnes        EQU     0x70
+measTens        EQU     0x71
+measHundreds    EQU     0x72
+
+;-------------------
+; PORTD Bit Meanings
+;-------------------
+; PORTD.1 = HEATING
+; PORTD.2 = COOLING
