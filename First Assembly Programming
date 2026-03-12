@@ -57,3 +57,6 @@ measHundreds    EQU     0x72
 ;-------------------
 ; PORTD.1 = HEATING
 ; PORTD.2 = COOLING
+
+HEATER  EQU 1
+COOLING EQU 2
