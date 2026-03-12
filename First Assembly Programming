@@ -75,3 +75,50 @@ COOLING EQU 2
 
     MOVLW   measuredTempInput
     MOVWF   measuredTemp
+
+;-------------------------
+; Compare temperatures and control outputs
+;-------------------------
+
+    BTFSC   measuredTemp,7         ; check sign bits
+    BRA     MEAS_NEGATIVE
+    BRA     MEAS_POSITIVE
+
+MEAS_NEGATIVE:
+    BTFSC   refTemp,7
+    BRA     SAME_SIGN_COMPARE      ; both negative
+    BRA     measuredTempLESS       ; measuredTemp negative, refTemp positive
+
+MEAS_POSITIVE:
+    BTFSC   refTemp,7
+    BRA     measuredTempGREATER    ; measuredTemp positive, refTemp negative
+    BRA     SAME_SIGN_COMPARE      ; both positive
+
+SAME_SIGN_COMPARE:
+    MOVF    refTemp,W
+    SUBWF   measuredTemp,W         ; W = measuredTemp - refTemp
+
+    BZ      TEMPSEQUAL
+    BC      measuredTempGREATER
+    BRA     measuredTempLESS
+
+TEMPSEQUAL:
+    CLRF    contReg                ; contReg = 0
+    BCF     LATD,HEATER            ; heating OFF
+    BCF     LATD,COOLING           ; cooling OFF
+    BRA     CONTINUE
+
+measuredTempGREATER:
+    MOVLW   0x02
+    MOVWF   contReg                ; contReg = 2
+    BCF     LATD,HEATER            ; heating OFF
+    BSF     LATD,COOLING           ; cooling ON
+    BRA     CONTINUE
+
+measuredTempLESS:
+    MOVLW   0x01
+    MOVWF   contReg                ; contReg = 1
+    BSF     LATD,HEATER            ; heating ON
+    BCF     LATD,COOLING           ; cooling OFF
+
+CONTINUE:
