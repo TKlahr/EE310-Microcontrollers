@@ -57,6 +57,21 @@ measHundreds    EQU     0x72
 ;-------------------
 ; PORTD.1 = HEATING
 ; PORTD.2 = COOLING
-
 HEATER  EQU 1
 COOLING EQU 2
+
+;-------------------------
+; Initialize PORTD
+;-------------------------
+    CLRF    TRISD       ; set PORTD pins as outputs
+    CLRF    LATD        ; clear all outputs (heater and cooling OFF)
+
+
+;-------------------------
+; Load input values
+;-------------------------
+    MOVLW   refTempInput
+    MOVWF   refTemp
+
+    MOVLW   measuredTempInput
+    MOVWF   measuredTemp
