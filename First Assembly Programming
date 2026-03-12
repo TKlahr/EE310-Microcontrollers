@@ -2,7 +2,7 @@
 // Title: First Assembly Programming
 //-----------------------------
 // Purpose: This program compares an input temperature to a measured temperature and either turns on a cooling fan or heater to regulate temperature. 
-// Dependencies: Not sure yet
+// Dependencies: xc.inc
 // Compiler: MPLAB X IDE v6.30
 // Author: Tyler Klahr
 // OUTPUTS: PORTD1 and PORTD2 are connected to the cooling fan and heater.
@@ -18,34 +18,33 @@
 ;-------------------------
 PSECT resetVec,class=CODE,reloc=2
 resetVec:
-    GOTO    start
+    GOTO    start       ; jump to main program
 
 ;-------------------------
 ; Program Code
 ;-------------------------
 PSECT code
-ORG     0x20
+ORG     0x20          ;Program starts at 0x20
 
 start:
 
 ;----------------
 ; Program Inputs
 ;----------------
-#define measuredTempInput  -5
-#define refTempInput       15
+#define measuredTempInput  -5       ; test value for measured temperature
+#define refTempInput       15       ; test value for referecence temperature
 
 ;-------------
 ; Definitions
 ;-------------
-refTemp         EQU     0x20
-measuredTemp    EQU     0x21
-contReg         EQU     0x22
+refTemp         EQU     0x20       ; register for referecence temperature
+measuredTemp    EQU     0x21       ; register for measured temperature
+contReg         EQU     0x22       ; control register
 
-REG10           EQU     0x10
-REG11           EQU     0x11
-REG01           EQU     0x01
+REG10           EQU     0x10       ; temporary register for referecence temperature conversion
+REG11           EQU     0x11       ; temporary register for measured temperature conversion
 
-refOnes         EQU     0x60
+refOnes         EQU     0x60       ; decimal storage registers
 refTens         EQU     0x61
 refHundreds     EQU     0x62
 
@@ -66,34 +65,34 @@ COOLING EQU 2
 ; Initialize PORTD
 ;-------------------------
     CLRF    TRISD       ; set PORTD pins as outputs
-    CLRF    LATD        ; clear all outputs (heater and cooling OFF)
+    CLRF    LATD        ; clear all outputs
 
 
 ;-------------------------
 ; Load input values
 ;-------------------------
     MOVLW   refTempInput
-    MOVWF   refTemp
+    MOVWF   refTemp       ; store reference temperature
 
     MOVLW   measuredTempInput
-    MOVWF   measuredTemp
+    MOVWF   measuredTemp       ; store measured temperature
 
 ;-------------------------
 ; Compare temperatures and control outputs
 ;-------------------------
-    BTFSC   measuredTemp,7         ; check sign bits
+    BTFSC   measuredTemp,7         ; check if measured temperature is negative
     BRA     MEAS_NEGATIVE
     BRA     MEAS_POSITIVE
 
 MEAS_NEGATIVE:
     BTFSC   refTemp,7
-    BRA     SAME_SIGN_COMPARE      ; both negative
+    BRA     SAME_SIGN_COMPARE      ; check if both negative
     BRA     measuredTempLESS       ; measuredTemp negative, refTemp positive
 
 MEAS_POSITIVE:
     BTFSC   refTemp,7
     BRA     measuredTempGREATER    ; measuredTemp positive, refTemp negative
-    BRA     SAME_SIGN_COMPARE      ; both positive
+    BRA     SAME_SIGN_COMPARE      
 
 SAME_SIGN_COMPARE:
     MOVF    refTemp,W
@@ -169,7 +168,7 @@ REF_TENS_DONE:
     MOVF measuredTemp,W
     MOVWF REG11
 
-; Make measuredTemp positive if negative
+; Make measuredTemp positive if negative (2s comp)
     BTFSS REG11,7
     BRA MEAS_ABS_READY
 
