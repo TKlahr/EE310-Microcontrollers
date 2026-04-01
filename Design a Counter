@@ -10,7 +10,7 @@
 ; Versions: 
 ;     v1.0: 4/1/26 - Initial version
 ;----------------------------------------------------
-       PROCESSOR   18F47K42
+
        #include    <xc.inc>
 
 ;----------------------------------------------------
@@ -122,38 +122,38 @@ return
 ; 7-Segment Table
 ;----------------------------------------------------
 SegTable:
-addwf PCL, f
-retlw b'00111111'
-retlw b'00000110'
-retlw b'01011011'
-retlw b'01001111'
-retlw b'01100110'
-retlw b'01101101'
-retlw b'01111101'
-retlw b'00000111'
-retlw b'01111111'
-retlw b'01101111'
-retlw b'01110111'
-retlw b'01111100'
-retlw b'00111001'
-retlw b'01011110'
-retlw b'01111001'
-retlw b'01110001'
+        addwf   PCL, f
+        retlw   0x3F    ; 0
+        retlw   0x06    ; 1
+        retlw   0x5B    ; 2
+        retlw   0x4F    ; 3
+        retlw   0x66    ; 4
+        retlw   0x6D    ; 5
+        retlw   0x7D    ; 6
+        retlw   0x07    ; 7
+        retlw   0x7F    ; 8
+        retlw   0x6F    ; 9
+        retlw   0x77    ; A
+        retlw   0x7C    ; b
+        retlw   0x39    ; C
+        retlw   0x5E    ; d
+        retlw   0x79    ; E
+        retlw   0x71    ; F
 
 ;----------------------------------------------------
 ; Delay Function
 ;----------------------------------------------------
 Delay:
-movlw 0xFF
-movwf temp
+        movlw   0xFF
+        movwf   temp
 Delay1:
-movlw 0xFF
-movwf temp2
+        movlw   0xFF
+        movwf   temp2
 Delay2:
-decfsz temp2, f
-goto Delay2
-decfsz temp, f
-goto Delay1
-return
+        decfsz  temp2, f
+        goto    Delay2
+        decfsz  temp, f
+        goto    Delay1
+        return
 
         end     resetVec
