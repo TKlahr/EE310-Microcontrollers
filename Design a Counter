@@ -1,0 +1,12 @@
+;----------------------------------------------------
+; Title: Hex Counter with 7-Segment Display
+;----------------------------------------------------
+; Purpose: This program uses two push buttons to control a hexadecimal counter displayed on a 7-segment display. One button increments the count, the other decrements it, and pressing both resets the count to zero.
+; Dependencies: xc.inc
+; Compiler: MPLAB X IDE v6.30 (XC8 Assembler)
+; Author: Tyler Klahr
+; Inputs: RB6 - Switch A (Increment), RB7 - Switch B (Decrement)
+; Outputs: RD0–RD6 - 7-segment display (segments A–G)
+; Versions: 
+;     v1.0: 4/1/26 - Initial version
+;----------------------------------------------------
