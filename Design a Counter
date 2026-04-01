@@ -36,7 +36,7 @@ temp2: DS 1
 ;----------------------------------------------------
 PSECT resetVec,class=CODE,reloc=2
 resetVec:
-goto Start
+        goto Start
 
 ;----------------------------------------------------
 ; Main Program
@@ -44,12 +44,12 @@ goto Start
 PSECT code
 
 Start:
-banksel ANSELB
-clrf ANSELB
-clrf ANSELD
+        banksel ANSELB
+        clrf    ANSELB
+        clrf    ANSELD
 
         banksel TRISB
-        movlw   b'11000000'
+        movlw   0xC0
         movwf   TRISB
 
         banksel TRISD
@@ -60,6 +60,7 @@ clrf ANSELD
 
         movlw   0x00
         movwf   count
+
 
 ;----------------------------------------------------
 MainLoop:
@@ -100,23 +101,23 @@ goto HoldLoop
 
 ;----------------------------------------------------
 ResetCount:
-clrf count
-call Delay
-goto MainLoop
+        clrf    count
+        call    Delay
+        goto    MainLoop
 
 ;----------------------------------------------------
 HoldLoop:
-goto MainLoop
+        goto    MainLoop
 
 ;----------------------------------------------------
 ; Display using POINTER (FSR0)
 ;----------------------------------------------------
 DisplayCount:
-movf count, w
-call SegTable
-lfsr 0, LATD
-movwf INDF0
-return
+        movf    count, w
+        call    SegTable
+        lfsr    0, LATD
+        movwf   INDF0
+        return
 
 ;----------------------------------------------------
 ; 7-Segment Table
