@@ -106,3 +106,34 @@ goto MainLoop
 ;----------------------------------------------------
 HoldLoop:
 goto MainLoop
+;----------------------------------------------------
+; Display using POINTER (FSR0)
+;----------------------------------------------------
+DisplayCount:
+movf count, w
+call SegTable
+lfsr 0, LATD
+movwf INDF0
+return
+
+;----------------------------------------------------
+; 7-Segment Table
+;----------------------------------------------------
+SegTable:
+addwf PCL, f
+retlw b'00111111'
+retlw b'00000110'
+retlw b'01011011'
+retlw b'01001111'
+retlw b'01100110'
+retlw b'01101101'
+retlw b'01111101'
+retlw b'00000111'
+retlw b'01111111'
+retlw b'01101111'
+retlw b'01110111'
+retlw b'01111100'
+retlw b'00111001'
+retlw b'01011110'
+retlw b'01111001'
+retlw b'01110001'
