@@ -43,7 +43,7 @@ resetVec:
 ;----------------------------------------------------
 PSECT code
 
-Start:
+Start:                     ; initialize ports
         banksel ANSELB
         clrf    ANSELB
         clrf    ANSELD
@@ -58,15 +58,15 @@ Start:
         banksel LATD
         clrf    LATD
 
-        movlw   0x00
+        movlw   0x00              ; initialize counter
         movwf   count
 
 
 ;----------------------------------------------------
 MainLoop:
-call DisplayCount
+call DisplayCount              ; display current count
 
-        banksel PORTB
+        banksel PORTB              ; check buttons
         btfss   PORTB, 6
         goto    CheckBOnly
         btfss   PORTB, 7
@@ -75,7 +75,7 @@ call DisplayCount
 
 ;----------------------------------------------------
 CheckAOnly:
-btfss PORTB, 6
+btfss PORTB, 6              ; check increment button(RB6)
 goto CheckBOnly
 
         movlw   0x0F
@@ -83,14 +83,14 @@ goto CheckBOnly
         goto    IncCount
         goto    HoldLoop
 
-IncCount:
+IncCount:              ; increment count
 incf count, f
 call Delay
 goto MainLoop
 
 ;----------------------------------------------------
 CheckBOnly:
-btfss PORTB, 7
+btfss PORTB, 7              ; check decrement button(RB7)
 goto HoldLoop
 
         movf    count, w
@@ -101,19 +101,19 @@ goto HoldLoop
 
 ;----------------------------------------------------
 ResetCount:
-        clrf    count
+        clrf    count              ; reset count to 0
         call    Delay
         goto    MainLoop
 
 ;----------------------------------------------------
 HoldLoop:
-        goto    MainLoop
+        goto    MainLoop              ; nothing pressed, hold value
 
 ;----------------------------------------------------
 ; Display using POINTER (FSR0)
 ;----------------------------------------------------
 DisplayCount:
-        movf    count, w
+        movf    count, w              ; convert count to 7-seg table
         call    SegTable
         lfsr    0, LATD
         movwf   INDF0
@@ -123,7 +123,7 @@ DisplayCount:
 ; 7-Segment Table
 ;----------------------------------------------------
 SegTable:
-        addwf   PCL, f
+        addwf   PCL, f              ; hex values 0-F
         retlw   0x3F    ; 0
         retlw   0x06    ; 1
         retlw   0x5B    ; 2
