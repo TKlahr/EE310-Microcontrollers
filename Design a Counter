@@ -41,3 +41,22 @@ goto Start
 ;----------------------------------------------------
 ; Main Program
 ;----------------------------------------------------
+PSECT code
+
+Start:
+banksel ANSELB
+clrf ANSELB
+clrf ANSELD
+
+        banksel TRISB
+        movlw   b'11000000'
+        movwf   TRISB
+
+        banksel TRISD
+        clrf    TRISD
+
+        banksel LATD
+        clrf    LATD
+
+        movlw   0x00
+        movwf   count
