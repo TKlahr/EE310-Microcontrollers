@@ -71,6 +71,7 @@ call DisplayCount
         btfss   PORTB, 7
         goto    CheckAOnly
         goto    ResetCount
+
 ;----------------------------------------------------
 CheckAOnly:
 btfss PORTB, 6
@@ -106,6 +107,7 @@ goto MainLoop
 ;----------------------------------------------------
 HoldLoop:
 goto MainLoop
+
 ;----------------------------------------------------
 ; Display using POINTER (FSR0)
 ;----------------------------------------------------
@@ -137,3 +139,21 @@ retlw b'00111001'
 retlw b'01011110'
 retlw b'01111001'
 retlw b'01110001'
+
+;----------------------------------------------------
+; Delay Function
+;----------------------------------------------------
+Delay:
+movlw 0xFF
+movwf temp
+Delay1:
+movlw 0xFF
+movwf temp2
+Delay2:
+decfsz temp2, f
+goto Delay2
+decfsz temp, f
+goto Delay1
+return
+
+        end     resetVec
