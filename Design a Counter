@@ -60,3 +60,49 @@ clrf ANSELD
 
         movlw   0x00
         movwf   count
+
+;----------------------------------------------------
+MainLoop:
+call DisplayCount
+
+        banksel PORTB
+        btfss   PORTB, 6
+        goto    CheckBOnly
+        btfss   PORTB, 7
+        goto    CheckAOnly
+        goto    ResetCount
+;----------------------------------------------------
+CheckAOnly:
+btfss PORTB, 6
+goto CheckBOnly
+
+        movlw   0x0F
+        cpfseq  count
+        goto    IncCount
+        goto    HoldLoop
+
+IncCount:
+incf count, f
+call Delay
+goto MainLoop
+
+;----------------------------------------------------
+CheckBOnly:
+btfss PORTB, 7
+goto HoldLoop
+
+        movf    count, w
+        bz      HoldLoop
+        decf    count, f
+        call    Delay
+        goto    MainLoop
+
+;----------------------------------------------------
+ResetCount:
+clrf count
+call Delay
+goto MainLoop
+
+;----------------------------------------------------
+HoldLoop:
+goto MainLoop
