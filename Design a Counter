@@ -10,3 +10,34 @@
 ; Versions: 
 ;     v1.0: 4/1/26 - Initial version
 ;----------------------------------------------------
+       PROCESSOR   18F47K42
+       #include    <xc.inc>
+
+;----------------------------------------------------
+; Configuration Bits
+;----------------------------------------------------
+CONFIG FEXTOSC = OFF
+CONFIG RSTOSC = HFINTOSC_1MHZ
+CONFIG CLKOUTEN = OFF
+CONFIG PR1WAY = ON
+CONFIG CSWEN = ON
+CONFIG FCMEN = OFF
+
+;----------------------------------------------------
+; Variables
+;----------------------------------------------------
+PSECT udata_acs
+count: DS 1
+temp: DS 1
+temp2: DS 1
+
+;----------------------------------------------------
+; Reset Vector
+;----------------------------------------------------
+PSECT resetVec,class=CODE,reloc=2
+resetVec:
+goto Start
+
+;----------------------------------------------------
+; Main Program
+;----------------------------------------------------
