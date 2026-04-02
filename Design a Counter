@@ -10,151 +10,212 @@
 ; Versions: 
 ;     v1.0: 4/1/26 - Initial version
 ;----------------------------------------------------
+#include "AssemblyConfig.inc"
+#include <xc.inc>
 
-       #include    <xc.inc>
+;---------------------
+; Delay constants
+;---------------------
+innerLoop  EQU 125
+outerLoop  EQU 100
+thirdLoop  EQU 12
 
-;----------------------------------------------------
-; Configuration Bits
-;----------------------------------------------------
-CONFIG FEXTOSC = OFF
-CONFIG RSTOSC = HFINTOSC_1MHZ
-CONFIG CLKOUTEN = OFF
-CONFIG PR1WAY = ON
-CONFIG CSWEN = ON
-CONFIG FCMEN = OFF
+;---------------------
+; Register locations
+;---------------------
+REG10      EQU 0x0A     ; start of 7-seg table (digit 0)
+REG25      EQU 0x19     ; end of table (digit F)
+REG31      EQU 0x31     ; delay counter 1
+REG32      EQU 0x32     ; delay counter 2
+REG33      EQU 0x33     ; delay counter 3
 
-;----------------------------------------------------
-; Variables
-;----------------------------------------------------
-PSECT udata_acs
-count: DS 1
-temp: DS 1
-temp2: DS 1
+;---------------------
+; I/O definitions
+;---------------------
+#define BUTTONA PORTB, 6   ; increment button
+#define BUTTONB PORTB, 7   ; decrement button
+#define DISPLAY LATD       ; 7-segment output
 
-;----------------------------------------------------
-; Reset Vector
-;----------------------------------------------------
+;---------------------
+; Reset vector
+;---------------------
 PSECT resetVec,class=CODE,reloc=2
 resetVec:
-        goto Start
+    GOTO Start
 
-;----------------------------------------------------
-; Main Program
-;----------------------------------------------------
+;---------------------
+; Main program
+;---------------------
 PSECT code
 
-Start:                     ; initialize ports
-        banksel ANSELB
-        clrf    ANSELB
-        clrf    ANSELD
+Start:
+    ;-----------------------------
+    ; Initialize PORTB (buttons)
+    ; RB6, RB7 = inputs
+    ;-----------------------------
+    BANKSEL PORTB
+    CLRF PORTB
+    BANKSEL LATB
+    CLRF LATB
+    BANKSEL ANSELB
+    CLRF ANSELB
+    BANKSEL TRISB
+    MOVLW 0xC0          ; RB6 and RB7 inputs
+    MOVWF TRISB
 
-        banksel TRISB
-        movlw   0xC0
-        movwf   TRISB
+    ;-----------------------------
+    ; Initialize PORTD (display)
+    ;-----------------------------
+    BANKSEL PORTD
+    CLRF PORTD
+    BANKSEL LATD
+    CLRF LATD
+    BANKSEL ANSELD
+    CLRF ANSELD
+    BANKSEL TRISD
+    CLRF TRISD          ; all outputs
 
-        banksel TRISD
-        clrf    TRISD
+    ;-----------------------------
+    ; Load 7-segment codes into RAM
+    ;-----------------------------
+    MOVLW 0xED
+    MOVWF REG10      ; 0
+    MOVLW 0x21
+    MOVWF 0x0B       ; 1
+    MOVLW 0xF4
+    MOVWF 0x0C       ; 2
+    MOVLW 0xF1
+    MOVWF 0x0D       ; 3
+    MOVLW 0x39
+    MOVWF 0x0E       ; 4
+    MOVLW 0xD9
+    MOVWF 0x0F       ; 5
+    MOVLW 0xDD
+    MOVWF 0x10       ; 6
+    MOVLW 0x61
+    MOVWF 0x11       ; 7
+    MOVLW 0xFD
+    MOVWF 0x12       ; 8
+    MOVLW 0xF9
+    MOVWF 0x13       ; 9
+    MOVLW 0x7D
+    MOVWF 0x14       ; A
+    MOVLW 0x9D
+    MOVWF 0x15       ; b
+    MOVLW 0xCC
+    MOVWF 0x16       ; C
+    MOVLW 0xB5
+    MOVWF 0x17       ; d
+    MOVLW 0xDC
+    MOVWF 0x18       ; E
+    MOVLW 0x5C
+    MOVWF REG25      ; F
 
-        banksel LATD
-        clrf    LATD
+    ;-----------------------------
+    ; Initialize pointer to 0
+    ;-----------------------------
+    LFSR 0, REG10
+    MOVF INDF0, W
+    MOVWF DISPLAY
 
-        movlw   0x00              ; initialize counter
-        movwf   count
-
-
-;----------------------------------------------------
+;====================================================
+; Main loop
+;====================================================
 MainLoop:
-call DisplayCount              ; display current count
 
-        banksel PORTB              ; check buttons
-        btfss   PORTB, 6
-        goto    CheckBOnly
-        btfss   PORTB, 7
-        goto    CheckAOnly
-        goto    ResetCount
+    ; Check increment button (active-high)
+    BTFSC BUTTONA
+    GOTO CheckB_WithA
 
-;----------------------------------------------------
-CheckAOnly:
-btfss PORTB, 6              ; check increment button(RB6)
-goto CheckBOnly
+    ; If A not pressed, check B
+    BTFSC BUTTONB
+    GOTO Decrease
 
-        movlw   0x0F
-        cpfseq  count
-        goto    IncCount
-        goto    HoldLoop
+    ; No buttons pressed → hold value
+    GOTO MainLoop
 
-IncCount:              ; increment count
-incf count, f
-call Delay
-goto MainLoop
+CheckB_WithA:
+    ; If both buttons pressed → reset
+    BTFSC BUTTONB
+    GOTO Zero
 
-;----------------------------------------------------
-CheckBOnly:
-btfss PORTB, 7              ; check decrement button(RB7)
-goto HoldLoop
+    ; Only A pressed → increase
+    GOTO Increase
 
-        movf    count, w
-        bz      HoldLoop
-        decf    count, f
-        call    Delay
-        goto    MainLoop
+;====================================================
+; Increase / decrease logic
+;====================================================
+Increase:
+    ; If at F, wrap to 0
+    MOVF INDF0, W
+    CPFSEQ REG25
+    GOTO Increment
+    GOTO Zero
 
-;----------------------------------------------------
-ResetCount:
-        clrf    count              ; reset count to 0
-        call    Delay
-        goto    MainLoop
+Decrease:
+    ; If at 0, wrap to F
+    MOVF INDF0, W
+    CPFSEQ REG10
+    GOTO Decrement
+    GOTO Max
 
-;----------------------------------------------------
-HoldLoop:
-        goto    MainLoop              ; nothing pressed, hold value
+Increment:
+    ; Move pointer to next digit
+    INCF FSR0L, F
+    MOVF INDF0, W
+    MOVWF DISPLAY
+    CALL loopDelay
+    GOTO MainLoop
 
-;----------------------------------------------------
-; Display using POINTER (FSR0)
-;----------------------------------------------------
-DisplayCount:
-        movf    count, w              ; convert count to 7-seg table
-        call    SegTable
-        lfsr    0, LATD
-        movwf   INDF0
-        return
+Decrement:
+    ; Move pointer to previous digit
+    DECF FSR0L, F
+    MOVF INDF0, W
+    MOVWF DISPLAY
+    CALL loopDelay
+    GOTO MainLoop
 
-;----------------------------------------------------
-; 7-Segment Table
-;----------------------------------------------------
-SegTable:
-        addwf   PCL, f              ; hex values 0-F
-        retlw   0x3F    ; 0
-        retlw   0x06    ; 1
-        retlw   0x5B    ; 2
-        retlw   0x4F    ; 3
-        retlw   0x66    ; 4
-        retlw   0x6D    ; 5
-        retlw   0x7D    ; 6
-        retlw   0x07    ; 7
-        retlw   0x7F    ; 8
-        retlw   0x6F    ; 9
-        retlw   0x77    ; A
-        retlw   0x7C    ; b
-        retlw   0x39    ; C
-        retlw   0x5E    ; d
-        retlw   0x79    ; E
-        retlw   0x71    ; F
+Max:
+    ; Set pointer to F
+    LFSR 0, REG25
+    MOVF INDF0, W
+    MOVWF DISPLAY
+    CALL loopDelay
+    GOTO MainLoop
 
-;----------------------------------------------------
-; Delay Function
-;----------------------------------------------------
-Delay:
-        movlw   0xFF
-        movwf   temp
-Delay1:
-        movlw   0xFF
-        movwf   temp2
-Delay2:
-        decfsz  temp2, f
-        goto    Delay2
-        decfsz  temp, f
-        goto    Delay1
-        return
+Zero:
+    ; Set pointer to 0
+    LFSR 0, REG10
+    MOVF INDF0, W
+    MOVWF DISPLAY
+    CALL loopDelay
+    GOTO MainLoop
 
-        end     resetVec
+;====================================================
+; Delay subroutine
+;====================================================
+loopDelay:
+    MOVLW innerLoop
+    MOVWF REG31
+    MOVLW outerLoop
+    MOVWF REG32
+    MOVLW thirdLoop
+    MOVWF REG33
+
+loop1:
+    DECF REG31, F
+    BNZ loop1
+
+    MOVLW innerLoop
+    MOVWF REG31
+
+    DECF REG32, F
+    BNZ loop1
+
+    MOVLW outerLoop
+    MOVWF REG32
+
+    DECF REG33, F
+    BNZ loop1
+
+    RETURN
