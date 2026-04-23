@@ -1,349 +1,242 @@
-/*
- * Title: Assignment 8 - Sensor Safe Box
- * Purpose: Uses two photoresistors as touchless inputs to enter a 2-digit code.
- *          If the code is correct, the relay turns the motor on.
- *          If the code is incorrect, the buzzer sounds.
- *          The emergency switch forces an alarm routine.
- * Compiler: XC8 / MPLAB X
- * MCU: PIC18F47K42
- */
+//-----------------------------
+// Title: Interfacing with Sensors
+//-----------------------------
+// Purpose: This program uses two photoresistors as touchless inputs to enter a two-digit code. 
+// If the correct code is entered, a relay is activated to run a motor and an LED turns on. 
+// If the code is incorrect, a buzzer sounds and the LED turns on. An external interrupt resets the system and turns all outputs off.
+// Dependencies: config.h, pic18f47k42.h, xc.h
+// Compiler: MPLAB X IDE v6.30 (XC8 v3.10)
+// Author: Tyler Klahr
+// OUTPUTS: 
+//   RA5 → Relay (Motor control)
+//   RA3 → LED
+//   RB2 → Buzzer
+//   RD0–RD6 → 7-segment display
+// INPUTS:
+//   RA0 → Photoresistor input (Digit 2)
+//   RA1 → Photoresistor input (Digit 1)
+//   RB0 → Emergency interrupt switch (INT0)
+//  	V1.0: 4/21/26 - First version 
+//  	V1.1: 4/22/26 - Second version with refference
 
 #include <xc.h>
 #include <stdint.h>
-#include <stdbool.h>
+#include "config.h"
+#include "pic18f47k42.h"
 
-#define _XTAL_FREQ 1000000UL
+int numTable[10] = {0x3F,0x06,0x5B,0x4F,0x66,0x6D,0x7D,0x07,0x7F,0x6F};
+int passCode1 = 2;
+int passCode2 = 3;
 
-// =====================
-// Configuration bits
-// =====================
-#pragma config FEXTOSC = OFF
-#pragma config RSTOSC = HFINTOSC_1MHZ
-#pragma config CLKOUTEN = OFF
-#pragma config CSWEN = ON
-#pragma config FCMEN = OFF
+volatile int resetFlag = 0;
 
-// =====================
-// User settings
-// =====================
+void init(void){
+   
+    // Buzzer pin RB2
+    ANSELBbits.ANSELB2 = 0; 
+    LATBbits.LATB2 = 0;
+    TRISBbits.TRISB2 = 0;
+     
+    // RA0, RA1 as input
+    TRISAbits.TRISA0 = 1;
+    TRISAbits.TRISA1 = 1;
 
-// Secret code: PR1 = 1, PR2 = 2
-#define SECRET_DIGIT_1   1
-#define SECRET_DIGIT_2   2
+    // RA3 LED, RA5 Motor as output
+    TRISAbits.TRISA3 = 0;
+    TRISAbits.TRISA5 = 0;
+  
+    // Digital mode
+    ANSELAbits.ANSELA0 = 0;
+    ANSELAbits.ANSELA1 = 0;
+    ANSELAbits.ANSELA3 = 0;
+    ANSELAbits.ANSELA5 = 0;
 
-// 1 = sensor active when input is LOW (covered / dark)
-// 0 = sensor active when input is HIGH
-#define SENSOR_ACTIVE_LOW    1
+    // Outputs OFF initially
+    LATAbits.LATA3 = 0;
+    LATAbits.LATA5 = 0;
+   
+    // 7-segment pins
+    TRISDbits.TRISD0 = 0;
+    TRISDbits.TRISD1 = 0;
+    TRISDbits.TRISD2 = 0;
+    TRISDbits.TRISD3 = 0;
+    TRISDbits.TRISD4 = 0;
+    TRISDbits.TRISD5 = 0;
+    TRISDbits.TRISD6 = 0;
+    
+    ANSELDbits.ANSELD0 = 0;
+    ANSELDbits.ANSELD1 = 0;
+    ANSELDbits.ANSELD2 = 0;
+    ANSELDbits.ANSELD3 = 0;
+    ANSELDbits.ANSELD4 = 0;
+    ANSELDbits.ANSELD5 = 0;
+    ANSELDbits.ANSELD6 = 0;
+    
+    LATDbits.LATD0 = 0;
+    LATDbits.LATD1 = 0;
+    LATDbits.LATD2 = 0;
+    LATDbits.LATD3 = 0;
+    LATDbits.LATD4 = 0;
+    LATDbits.LATD5 = 0;
+    LATDbits.LATD6 = 0;
+    
+    // RB0 as interrupt input
+    TRISBbits.TRISB0 = 1;
+    ANSELBbits.ANSELB0 = 0;
 
-// 1 = relay module turns ON with logic HIGH at IN pin
-// 0 = relay module turns ON with logic LOW at IN pin
-#define RELAY_ACTIVE_HIGH    1
+    // INT0 interrupt setup
+    INTCON0bits.INT0EDG = 1;   // rising edge
+    PIR1bits.INT0IF = 0;       // clear flag
+    PIE1bits.INT0IE = 1;       // enable INT0
+    INTCON0bits.GIE = 1;       // global interrupt enable
+}
 
-// =====================
-// Pin macros
-// =====================
+void Sevenseg_Disp(int number){
+    switch (number)
+    {
+        case 0: LATD = numTable[0]; break;
+        case 1: LATD = numTable[1]; break;
+        case 2: LATD = numTable[2]; break;
+        case 3: LATD = numTable[3]; break;
+        case 4: LATD = numTable[4]; break;
+        case 5: LATD = numTable[5]; break;
+        case 6: LATD = numTable[6]; break;
+        case 7: LATD = numTable[7]; break;
+        case 8: LATD = numTable[8]; break;
+        case 9: LATD = numTable[9]; break;
+        default: LATD = numTable[0]; break;
+    }
+}
 
-// Inputs
-#define PR1_PORT        PORTAbits.RA7
-#define PR2_PORT        PORTAbits.RA6
-#define EMERGENCY_PORT  PORTCbits.RC5
+void __interrupt(__irq(IRQ_INT0), __high_priority) ISR(void)
+{
+    LATAbits.LATA5 = 0;   // Motor OFF
+    LATBbits.LATB2 = 0;   // Buzzer OFF
+    LATAbits.LATA3 = 0;   // LED OFF
 
-// Outputs
-#define RELAY_LAT       LATAbits.LATA2
-#define BUZZER_LAT      LATCbits.LATC0
-#define SYSLED_LAT      LATEbits.LATE0
+    resetFlag = 1;
+    PIR1bits.INT0IF = 0;
+}
 
-// 7-segment pins (common anode)
-#define SEG_A_LAT       LATDbits.LATD0
-#define SEG_B_LAT       LATDbits.LATD1
-#define SEG_C_LAT       LATDbits.LATD2
-#define SEG_D_LAT       LATDbits.LATD3
-#define SEG_E_LAT       LATDbits.LATD4
-#define SEG_F_LAT       LATDbits.LATD5
-#define SEG_G_LAT       LATDbits.LATD6
+int isDigit2_pressed(){
+    return(PORTAbits.RA0);
+}
 
-// =====================
-// Function prototypes
-// =====================
-static void init_system(void);
-static void display_blank(void);
-static void display_digit(uint8_t digit);
-static void set_segments(bool a, bool b, bool c, bool d, bool e, bool f, bool g);
-static bool pr1_active(void);
-static bool pr2_active(void);
-static bool emergency_pressed(void);
-static void wait_for_pr1_release(void);
-static void wait_for_pr2_release(void);
-static void relay_on(void);
-static void relay_off(void);
-static void buzzer_on(void);
-static void buzzer_off(void);
-static void error_beep(void);
-static void emergency_alarm(void);
-static void run_motor_sequence(void);
+int isDigit1_pressed(){
+    return(PORTAbits.RA1);
+}
 
-// =====================
-// Main
-// =====================
+void Turn_On_Motor(){
+    LATAbits.LATA5 = 1;
+}
+
+void Turn_Off_Motor(){
+    LATAbits.LATA5 = 0;
+}
+
+void Turn_On_Buzzer(){
+    LATBbits.LATB2 = 1;
+}
+
+void Turn_Off_Buzzer(){
+    LATBbits.LATB2 = 0;
+}
+
+void Turn_On_Led(){
+    LATAbits.LATA3 = 1;
+}
+
+void Turn_Off_Led(){
+    LATAbits.LATA3 = 0;
+}
+
 void main(void)
 {
-    uint8_t code[2];
-    uint8_t count = 0;
+    int digit1 = 0;
+    int digit2 = 0;
+    int TimeStamp = 0;
+    int DigitFlag = 0;
 
-    init_system();
+    init();
 
-    while (1)
+    while(1)
     {
-        SYSLED_LAT = 1;      // system LED always on while enabled
-        relay_off();
-
-        // emergency check
-        if (emergency_pressed())
+        if(resetFlag)
         {
-            emergency_alarm();
-            display_blank();
-            count = 0;
+            digit1 = 0;
+            digit2 = 0;
+            TimeStamp = 0;
+            DigitFlag = 0;
+
+            Turn_Off_Motor();
+            Turn_Off_Buzzer();
+            Turn_Off_Led();
+
+            Sevenseg_Disp(0);
+
+            resetFlag = 0;
         }
 
-        // wait for first / next touchless input
-        if (pr1_active())
+        if(isDigit1_pressed())
         {
-            __delay_ms(40);   // debounce / settle
-            if (pr1_active())
-            {
-                code[count] = 1;
-                display_digit(1);
-                count++;
-                wait_for_pr1_release();
-            }
+            digit1++;
+            DigitFlag = 0;
+            TimeStamp = 0;
+            while(isDigit1_pressed());
         }
-        else if (pr2_active())
+        
+        if(isDigit2_pressed())
         {
-            __delay_ms(40);
-            if (pr2_active())
-            {
-                code[count] = 2;
-                display_digit(2);
-                count++;
-                wait_for_pr2_release();
-            }
+            digit2++;
+            DigitFlag = 1;
+            TimeStamp = 0;
+            while(isDigit2_pressed());
         }
 
-        // if two digits entered, evaluate code
-        if (count >= 2)
-        {
-            __delay_ms(250);
-
-            if ((code[0] == SECRET_DIGIT_1) && (code[1] == SECRET_DIGIT_2))
+        if(DigitFlag == 0){
+            Sevenseg_Disp(digit1);
+        }
+        else if(DigitFlag == 1){
+            Sevenseg_Disp(digit2);
+        }
+        
+        if(TimeStamp == 50){
+            if((passCode1 == digit1) && (passCode2 == digit2))
             {
-                run_motor_sequence();
+                Turn_On_Motor();
+                Turn_On_Led();
+
+//                for(int i = 0; i < 50; i++)
+//                {
+//                    if(resetFlag) break;
+//                    __delay_ms(100);
+//                }
+//
+//                Turn_Off_Motor();
+//                Turn_Off_Led();
             }
             else
             {
-                error_beep();
+                Turn_On_Buzzer();
+                Turn_On_Led();
+
+                for(int i = 0; i < 50; i++)
+                {
+                    if(resetFlag) break;
+                    __delay_ms(100);
+                }
+
+                Turn_Off_Buzzer();
+                Turn_Off_Led();
             }
 
-            display_blank();
-            count = 0;
+            digit1 = 0;
+            digit2 = 0;
+            TimeStamp = 0;
+            Sevenseg_Disp(0);
         }
-    }
-}
 
-// =====================
-// Initialization
-// =====================
-static void init_system(void)
-{
-    // All digital
-    ANSELA = 0x00;
-    ANSELC = 0x00;
-    ANSELD = 0x00;
-    ANSELE = 0x00;
-
-    // Input directions
-    TRISAbits.TRISA7 = 1;   // PR1
-    TRISAbits.TRISA6 = 1;   // PR2
-    TRISCbits.TRISC5 = 1;   // Emergency switch
-
-    // Output directions
-    TRISAbits.TRISA2 = 0;   // Relay IN
-    TRISCbits.TRISC0 = 0;   // Buzzer
-    TRISEbits.TRISE0 = 0;   // System LED
-
-    TRISDbits.TRISD0 = 0;   // 7-seg A
-    TRISDbits.TRISD1 = 0;   // 7-seg B
-    TRISDbits.TRISD2 = 0;   // 7-seg C
-    TRISDbits.TRISD3 = 0;   // 7-seg D
-    TRISDbits.TRISD4 = 0;   // 7-seg E
-    TRISDbits.TRISD5 = 0;   // 7-seg F
-    TRISDbits.TRISD6 = 0;   // 7-seg G
-
-    // Start states
-    relay_off();
-    buzzer_off();
-    SYSLED_LAT = 1;
-    display_blank();
-}
-
-// =====================
-// Input helpers
-// =====================
-static bool pr1_active(void)
-{
-#if SENSOR_ACTIVE_LOW
-    return (PR1_PORT == 0);
-#else
-    return (PR1_PORT == 1);
-#endif
-}
-
-static bool pr2_active(void)
-{
-#if SENSOR_ACTIVE_LOW
-    return (PR2_PORT == 0);
-#else
-    return (PR2_PORT == 1);
-#endif
-}
-
-static bool emergency_pressed(void)
-{
-    return (EMERGENCY_PORT == 1);   // switch to VCC with pulldown
-}
-
-static void wait_for_pr1_release(void)
-{
-    while (pr1_active())
-    {
-        if (emergency_pressed())
-        {
-            emergency_alarm();
-            break;
-        }
-    }
-    __delay_ms(80);
-}
-
-static void wait_for_pr2_release(void)
-{
-    while (pr2_active())
-    {
-        if (emergency_pressed())
-        {
-            emergency_alarm();
-            break;
-        }
-    }
-    __delay_ms(80);
-}
-
-// =====================
-// Output helpers
-// =====================
-static void relay_on(void)
-{
-#if RELAY_ACTIVE_HIGH
-    RELAY_LAT = 1;
-#else
-    RELAY_LAT = 0;
-#endif
-}
-
-static void relay_off(void)
-{
-#if RELAY_ACTIVE_HIGH
-    RELAY_LAT = 0;
-#else
-    RELAY_LAT = 1;
-#endif
-}
-
-static void buzzer_on(void)
-{
-    BUZZER_LAT = 1;
-}
-
-static void buzzer_off(void)
-{
-    BUZZER_LAT = 0;
-}
-
-// =====================
-// System actions
-// =====================
-static void run_motor_sequence(void)
-{
-    relay_on();
-    __delay_ms(3000);
-    relay_off();
-}
-
-static void error_beep(void)
-{
-    buzzer_on();
-    __delay_ms(300);
-    buzzer_off();
-    __delay_ms(150);
-    buzzer_on();
-    __delay_ms(300);
-    buzzer_off();
-}
-
-static void emergency_alarm(void)
-{
-    relay_off();
-
-    for (uint8_t i = 0; i < 8; i++)
-    {
-        buzzer_on();
-        __delay_ms(120);
-        buzzer_off();
-        __delay_ms(120);
-    }
-}
-
-// =====================
-// 7-segment display
-// Common anode:
-// segment ON  = 0
-// segment OFF = 1
-// =====================
-static void set_segments(bool a, bool b, bool c, bool d, bool e, bool f, bool g)
-{
-    SEG_A_LAT = a ? 0 : 1;
-    SEG_B_LAT = b ? 0 : 1;
-    SEG_C_LAT = c ? 0 : 1;
-    SEG_D_LAT = d ? 0 : 1;
-    SEG_E_LAT = e ? 0 : 1;
-    SEG_F_LAT = f ? 0 : 1;
-    SEG_G_LAT = g ? 0 : 1;
-}
-
-static void display_blank(void)
-{
-    SEG_A_LAT = 1;
-    SEG_B_LAT = 1;
-    SEG_C_LAT = 1;
-    SEG_D_LAT = 1;
-    SEG_E_LAT = 1;
-    SEG_F_LAT = 1;
-    SEG_G_LAT = 1;
-}
-
-static void display_digit(uint8_t digit)
-{
-    switch (digit)
-    {
-        case 0: set_segments(1,1,1,1,1,1,0); break;
-        case 1: set_segments(0,1,1,0,0,0,0); break;
-        case 2: set_segments(1,1,0,1,1,0,1); break;
-        case 3: set_segments(1,1,1,1,0,0,1); break;
-        case 4: set_segments(0,1,1,0,0,1,1); break;
-        case 5: set_segments(1,0,1,1,0,1,1); break;
-        case 6: set_segments(1,0,1,1,1,1,1); break;
-        case 7: set_segments(1,1,1,0,0,0,0); break;
-        case 8: set_segments(1,1,1,1,1,1,1); break;
-        case 9: set_segments(1,1,1,1,0,1,1); break;
-        default: display_blank(); break;
+        __delay_ms(100);  
+        TimeStamp++;
     }
 }
