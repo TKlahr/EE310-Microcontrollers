@@ -16,20 +16,22 @@
 // VERSIONS:
 //   V1.0: 5/3/26 - Initial version with LCD interface
 //   V1.1: 5/4/26 - Added ADC input and voltage display functionality
+--------------
 
 #include <xc.h>
 #include <stdio.h>
 
-// CONFIG (keep yours if already working)
+// CONFIG
 #pragma config FEXTOSC = OFF
 #pragma config RSTOSC = HFINTOSC_1MHZ
 #pragma config CLKOUTEN = OFF
 #pragma config MCLRE = EXTMCLR
 #pragma config LVP = ON
+#pragma config MVECEN = OFF
 
 #define _XTAL_FREQ 4000000
 
-// LCD pin definitions
+// LCD pins
 #define RS LATD0
 #define EN LATD1
 #define ldata LATB
@@ -37,7 +39,7 @@
 #define LCD_Port TRISB
 #define LCD_Control TRISD
 
-// Function Prototypes
+// Prototypes
 void LCD_Init(void);
 void LCD_Command(char);
 void LCD_Char(char);
@@ -50,14 +52,17 @@ void ADC_Init(void);
 unsigned int ADC_Read(void);
 void Display_Voltage(void);
 
+void IOC_Init(void);
+void __interrupt() ISR(void);
+
 //-------------------- MAIN --------------------
 void main(void)
 {
-    // LCD digital pins
+    // LCD digital
     ANSELB = 0x00;
     ANSELD = 0x00;
 
-    // ADC pin (RA1)
+    // ADC input RA1
     TRISAbits.TRISA1 = 1;
     ANSELAbits.ANSELA1 = 1;
 
@@ -68,6 +73,7 @@ void main(void)
     LCD_Clear();
 
     ADC_Init();
+    IOC_Init();
 
     while(1)
     {
@@ -79,10 +85,10 @@ void main(void)
 //-------------------- ADC --------------------
 void ADC_Init(void)
 {
-    ADCON0bits.ADFM = 1;   // Right justified
-    ADCON0bits.CS = 1;     // Internal clock
-    ADPCH = 0x01;          // ANA1 (RA1)
-    ADCON0bits.ADON = 1;   // Turn on ADC
+    ADCON0bits.ADFM = 1;
+    ADCON0bits.CS = 1;
+    ADPCH = 0x01;
+    ADCON0bits.ADON = 1;
 }
 
 unsigned int ADC_Read(void)
@@ -93,6 +99,7 @@ unsigned int ADC_Read(void)
     return ((unsigned int)ADRESH << 8) | ADRESL;
 }
 
+//-------------------- DISPLAY --------------------
 void Display_Voltage(void)
 {
     unsigned int adcValue;
@@ -103,7 +110,6 @@ void Display_Voltage(void)
     adcValue = ADC_Read();
     voltage = ((float)adcValue / 4095.0) * 5.0;
 
-    // --- Sound classification ---
     if (voltage < 1.5)
         soundLevel = "quiet";
     else if (voltage < 2.5)
@@ -113,12 +119,55 @@ void Display_Voltage(void)
     else
         soundLevel = "obnox";
 
-    // --- Display ---
     LCD_String_xy(1, 0, "Sound:        ");
     LCD_String_xy(1, 7, soundLevel);
 
     sprintf(buffer, "%.2fV Level   ", voltage);
     LCD_String_xy(2, 0, buffer);
+}
+
+//-------------------- INTERRUPT --------------------
+void IOC_Init(void)
+{
+    // RC1 input (button)
+    TRISCbits.TRISC1 = 1;
+    ANSELCbits.ANSELC1 = 0;
+
+    // RE0 output (LED)
+    TRISEbits.TRISE0 = 0;
+    ANSELEbits.ANSELE0 = 0;
+    LATEbits.LATE0 = 0;
+
+    // IOC setup
+    IOCCPbits.IOCCP1 = 1;
+    IOCCNbits.IOCCN1 = 0;
+    IOCCFbits.IOCCF1 = 0;
+
+    PIE0bits.IOCIE = 1;
+    PIR0bits.IOCIF = 0;
+
+    INTCON0bits.GIE = 1;
+}
+
+void __interrupt() ISR(void)
+{
+    if(PIR0bits.IOCIF)
+    {
+        if(IOCCFbits.IOCCF1)
+        {
+            IOCCFbits.IOCCF1 = 0;
+            PIR0bits.IOCIF = 0;
+
+            // HALT: blink LED for ~10 sec
+            for(int i = 0; i < 50; i++)
+            {
+                LATEbits.LATE0 = 1;
+                MSdelay(100);
+                LATEbits.LATE0 = 0;
+                MSdelay(100);
+            }
+        }
+    }
 }
 
 //-------------------- LCD --------------------
