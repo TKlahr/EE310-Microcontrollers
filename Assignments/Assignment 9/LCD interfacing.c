@@ -98,15 +98,26 @@ void Display_Voltage(void)
     unsigned int adcValue;
     float voltage;
     char buffer[16];
+    char *soundLevel;
 
     adcValue = ADC_Read();
-
     voltage = ((float)adcValue / 4095.0) * 5.0;
 
-    LCD_Clear();
-    LCD_String_xy(1, 0, "Input Voltage:");
+    // --- Sound classification ---
+    if (voltage < 1.5)
+        soundLevel = "quiet";
+    else if (voltage < 2.5)
+        soundLevel = "normal";
+    else if (voltage < 3.5)
+        soundLevel = "loud";
+    else
+        soundLevel = "obnox";
 
-    sprintf(buffer, "%.2f V", voltage);
+    // --- Display ---
+    LCD_String_xy(1, 0, "Sound:        ");
+    LCD_String_xy(1, 7, soundLevel);
+
+    sprintf(buffer, "%.2fV Level   ", voltage);
     LCD_String_xy(2, 0, buffer);
 }
 
