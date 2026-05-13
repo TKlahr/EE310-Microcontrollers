@@ -9,7 +9,7 @@
 #define SW_RIGHT  PORTBbits.RB7
 
 #define SERVO_MIN     22   // about 1.0 ms
-#define SERVO_CENTER  51   // about 1.5 ms
+#define SERVO_CENTER  50   // about 1.5 ms
 #define SERVO_MAX     81   // about 2.0 ms
 
 _Bool pwmStatus;
