@@ -1,75 +1,57 @@
-/*
-* The purpose of this program is to generate a PWM with different pulse width 
-* The output of the PWM will be on RB2
-* myLED is connected to RB0 and it toggles very slowly
-* In order to change the PULSE period and width you need to do the following: 
+#include <xc.h>
+#include "PWM.h"
+#include "Configfile.h"
 
- * PWM Period=
- * [T2PR+1]*4*Tosc*PreScale
+#define _XTAL_FREQ 4000000
 
- * Pulse Width=
- * Tosc*Prescale*CCPR2
+#define SERVO_LEFT    31
+#define SERVO_CENTER  47
+#define SERVO_RIGHT   63
 
- * Duty Cycle Ratio %=
- * CCPR2 / [4*(T2PR+1)]
-
- * The prescale value for the timer is defined in T2CON register. 
- * The ACTUAL value of CCP2 MUST be varied by changing
- * PWM2_INITIALIZE_DUTY_VALUE set to the equivalent decimal value for CCPR2
-
- * Author: Farid Farahmand
- */
-
-
-
-
-#include <xc.h> // must have this
-#include "PWM.h" // must have this
-#include "Configfile.h" // must have this -  XC8_ConfigFile.h
-//#include "../../../../../Program Files/Microchip/xc8/v2.40/pic/include/proc/pic18f46k42.h"
-//#include "C:\Program Files\Microchip\xc8\v2.40\pic\include\proc\pic18f46k42"
-
-
-#define _XTAL_FREQ 4000000      // Fosc  frequency for _delay()  library
-#define FCY    _XTAL_FREQ/4     // system clock is 1 usec
-
-#define myLED  PORTBbits.RB0
-#define PWM2_INITIALIZE_DUTY_VALUE 205
-
-uint16_t checkdutyCycle;
-char preScale;
 _Bool pwmStatus;
 
-void main (void) {
-    OSCSTATbits.HFOR =1; // enable  HFINTOSC Oscillator (see clock schematic))
-    OSCFRQ=0x02; // 00=1 MHZ, 02=4MHZ internal - see page 106 of data sheet
-    
-    ANSELB = 0b00000000;    
-    TRISB= 0b00000000;//sets PORTB as all outputs 
-    PORTB= 0b00000000;//turns off PORTB outputs so that the LED is initially off
+void main(void)
+{
+    OSCSTATbits.HFOR = 1;
+    OSCFRQ = 0x02;          // 4 MHz internal oscillator
+
+    ANSELB = 0x00;          // PORTB digital
+
+    TRISBbits.TRISB2 = 0;   // RB2 servo signal output
+    TRISBbits.TRISB6 = 1;   // top button input
+    TRISBbits.TRISB7 = 1;   // bottom button input
+
+    WPUBbits.WPUB6 = 1;     // weak pull-up for RB6
+    WPUBbits.WPUB7 = 1;     // weak pull-up for RB7
+
+    PORTB = 0x00;
+
     TMR2_Initialize();
-    T2PR = 127;
-    //T2CON = 0x40;
-    TMR2_StartTimer();        
-    
+    T2PR = 155;             // about 20 ms servo period
+    //T2CON = 0x70;           // Timer2 prescale for servo PWM
+    TMR2_StartTimer();
+
     PWM_Output_D8_Enable();
     PWM2_Initialize();
-    PWM2_LoadDutyValue(PWM2_INITIALIZE_DUTY_VALUE ); // initialize CCPR2H/L
-   // PWM_Output_D8_Disable();
-   // TMR2_StopTimer();  
 
-    // Duty Cycle in percentage 
-    checkdutyCycle =(uint16_t)((100UL*PWM2_INITIALIZE_DUTY_VALUE)/(4*(T2PR+1)));
-    // binary value of Register T2CON.PRESCALE
-    preScale = ((T2CON >> 4) & (0x0F)); 
-    
-    while (1) {
+    PWM2_LoadDutyValue(SERVO_CENTER);
+
+    while(1)
+    {
+        if(PORTBbits.RB6 == 0)
+        {
+            PWM2_LoadDutyValue(SERVO_LEFT);
+        }
+        else if(PORTBbits.RB7 == 0)
+        {
+            PWM2_LoadDutyValue(SERVO_RIGHT);
+        }
+        else
+        {
+            PWM2_LoadDutyValue(SERVO_CENTER);
+        }
+
         pwmStatus = PWM2_OutputStatusGet();
         PORTBbits.RB2 = pwmStatus;
-        //T2CON=0x00; // stop the timer & do what you have to do
-        if (PIR4bits.TMR2IF == 1) {
-            PIR4bits.TMR2IF = 0;
-            myLED ^= 1; // ISR code goes here
-        }
     }
 }
