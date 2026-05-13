@@ -5,12 +5,13 @@
 
 #define _XTAL_FREQ 4000000
 
+#define SW_CENTER PORTBbits.RB5
 #define SW_LEFT   PORTBbits.RB6
 #define SW_RIGHT  PORTBbits.RB7
 
-#define SERVO_MIN     22   // about 1.0 ms
-#define SERVO_CENTER  50   // about 1.5 ms
-#define SERVO_MAX     81   // about 2.0 ms
+#define SERVO_MIN     22
+#define SERVO_CENTER  50
+#define SERVO_MAX     81
 
 _Bool pwmStatus;
 uint8_t servoPosition = SERVO_CENTER;
@@ -24,15 +25,16 @@ void main(void)
     ANSELB = 0x00;          // PORTB digital
 
     TRISBbits.TRISB2 = 0;   // RB2 servo PWM output
-    TRISBbits.TRISB6 = 1;   // SW1 input
-    TRISBbits.TRISB7 = 1;   // SW2 input
+    TRISBbits.TRISB5 = 1;   // center button input
+    TRISBbits.TRISB6 = 1;   // left button input
+    TRISBbits.TRISB7 = 1;   // right button input
 
-    WPUBbits.WPUB6 = 1;     // pull-up for SW1
-    WPUBbits.WPUB7 = 1;     // pull-up for SW2
+    WPUBbits.WPUB5 = 1;     // pull-up for center button
+    WPUBbits.WPUB6 = 1;     // pull-up for left button
+    WPUBbits.WPUB7 = 1;     // pull-up for right button
 
     TMR2_Initialize();
     T2PR = 155;             // about 20 ms period
-    //T2CON = 0x70;           // servo Timer2 setup
     TMR2_StartTimer();
 
     PWM_Output_D8_Enable();
@@ -41,22 +43,24 @@ void main(void)
 
     while(1)
     {
-        // Keep software PWM constantly updated
         pwmStatus = PWM2_OutputStatusGet();
         PORTBbits.RB2 = pwmStatus;
 
-        // Only change servo position once every PWM period
         if(PIR4bits.TMR2IF == 1)
         {
             PIR4bits.TMR2IF = 0;
 
             moveCounter++;
 
-            if(moveCounter >= 2)   // increase number for slower movement
+            if(moveCounter >= 2)
             {
                 moveCounter = 0;
 
-                if(SW_LEFT == 0 && servoPosition > SERVO_MIN)
+                if(SW_CENTER == 0)
+                {
+                    servoPosition = SERVO_CENTER;
+                }
+                else if(SW_LEFT == 0 && servoPosition > SERVO_MIN)
                 {
                     servoPosition--;
                 }
