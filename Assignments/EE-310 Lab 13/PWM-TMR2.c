@@ -10,11 +10,12 @@
 #define SW_RIGHT  PORTBbits.RB7
 
 #define SERVO_MIN     22
-#define SERVO_CENTER  50
+#define SERVO_CENTER  51
 #define SERVO_MAX     81
 
 _Bool pwmStatus;
 uint8_t servoPosition = SERVO_CENTER;
+uint8_t oldPosition = SERVO_CENTER;
 uint8_t moveCounter = 0;
 
 void main(void)
@@ -29,9 +30,9 @@ void main(void)
     TRISBbits.TRISB6 = 1;   // left button input
     TRISBbits.TRISB7 = 1;   // right button input
 
-    WPUBbits.WPUB5 = 1;     // pull-up for center button
-    WPUBbits.WPUB6 = 1;     // pull-up for left button
-    WPUBbits.WPUB7 = 1;     // pull-up for right button
+    WPUBbits.WPUB5 = 1;
+    WPUBbits.WPUB6 = 1;
+    WPUBbits.WPUB7 = 1;
 
     TMR2_Initialize();
     T2PR = 155;             // about 20 ms period
@@ -69,7 +70,11 @@ void main(void)
                     servoPosition++;
                 }
 
-                PWM2_LoadDutyValue(servoPosition);
+                if(servoPosition != oldPosition)
+                {
+                    PWM2_LoadDutyValue(servoPosition);
+                    oldPosition = servoPosition;
+                }
             }
         }
     }
